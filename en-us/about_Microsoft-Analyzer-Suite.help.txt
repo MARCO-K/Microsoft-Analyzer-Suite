@@ -1,0 +1,11 @@
+﻿TOPIC
+	about_Microsoft-Analyzer-Suite
+	
+SHORT DESCRIPTION
+	Explains how to use the Microsoft-Analyzer-Suite powershell module
+	
+LONG DESCRIPTION
+	<Insert Content here>
+
+KEYWORDS
+	Microsoft-Analyzer-Suite
