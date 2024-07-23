@@ -1,14 +1,14 @@
-function Import-SupportlistCSV {
+function Import-SupportlistFromCSV {
 
     Param
     (
         [Parameter(Mandatory = $true)]
         [ValidateScript({ Test-Path $_ -PathType Leaf })]
         [string]
-        $blacklistFile
+        $listFile
     )
     begin {
-        $File = Get-Item -Path $blacklistFile -Filter '*.csv'
+        $File = Get-Item -Path $listFile -Filter '*.csv'
     }
 
     process {
