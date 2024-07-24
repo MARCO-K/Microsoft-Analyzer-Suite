@@ -21,7 +21,7 @@ function Write-Logo {
     Write-Output ""
 
     # Analysis date (ISO 8601)
-    $script:AnalysisDate = [datetime]::Now.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $script:AnalysisDate = ConvertTo-Iso8601DateTime (Get-Date) -AsString
     Write-Output "Analysis date: $AnalysisDate UTC"
     Write-Output ""
 }
