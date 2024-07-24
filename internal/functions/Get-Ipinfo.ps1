@@ -1,5 +1,5 @@
 
-function Get-Ipinfo{   
+function Get-Ipinfo {   
     <#
     .SYNOPSIS
     Retrieves IP information from a list of IP addresses using the IPInfo API.
@@ -7,13 +7,13 @@ function Get-Ipinfo{
     .DESCRIPTION
     The get-Ipinfo function retrieves IP information from a list of IP addresses using the IPInfo API. It reads the IP addresses from a text file and sends requests to the IPInfo API to get the information for each IP address. The function then processes the API response and returns the IP information as objects.
 
-    .PARAMETER token
+    .PARAMETER Token
     The API token to authenticate the requests to the IPInfo API. By default, it is set to '1210be81001a80'.
 
-    .PARAMETER list
+    .PARAMETER AddressList
     The path to the text file that contains the list of IP addresses. By default, it is set to 'C:\temp\IpAddress\IP.txt'.
 
-    .PARAMETER fields
+    .PARAMETER Fields
     The fields to include in the API response. By default, it is set to 'ip,hostname,anycast,city,region,country,country_name,loc,org,postal,timezone'.
 
     .EXAMPLE
@@ -24,63 +24,69 @@ function Get-Ipinfo{
     #>
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
-        [string]$token,
-        [Parameter(Mandatory=$true)]
-        [string]$addresslist,
-        [string]$fields = 'ip,hostname,anycast,city,region,country,country_name,loc,org,postal,timezone'
+        [Parameter(Mandatory = $true)]
+        [string]$Token,
+    
+        [Parameter(Mandatory = $true)]
+        [string]$AddressList,
+    
+        [string]$Fields = 'ip,hostname,anycast,city,region,country,country_name,loc,org,postal,timezone'
     )
     
     begin {
-            # Check if the IP list exists and is not empty
-            if (Test-Path -Path $list -PathType Leaf)
-                {$ip_list = Get-Content $list}
-            else {
-                'IP list not found.'
-                break
-            }
-            if(-not($ip_list.Count -gt 1)) {
-                'IP list is empty.'
-                break
-            }
-            
-            if (Test-Path "$env:LOCALAPPDATA\ipinfo\ipinfo.exe") {
-                $ipinfo = "$env:LOCALAPPDATA\ipinfo\ipinfo.exe"
-               }
-            else {
-                'IPInfo executable not found.'
-                break
-            }
+    
+        # Check if the IP list exists and is not empty
+        if (-not (Test-Path -Path $AddressList -PathType Leaf)) {
+            Write-PSFMessage -Level Error -Message "IP list not found: $AddressList"
+            throw "IP list not found: $AddressList"
+        }
+    
+        $ipList = Get-Content $AddressList
+        if ($ipList.Count -eq 0) {
+            Write-PSFMessage -Level Error -Message "IP list is empty: $AddressList"
+            throw "IP list is empty: $AddressList"
+        }
+    
+        $ipinfoPath = "$env:LOCALAPPDATA\ipinfo\ipinfo.exe"
+        if (-not (Test-Path $ipinfoPath)) {
+            Write-PSFMessage -Level Error -Message "IPInfo executable not found: $ipinfoPath"
+            throw "IPInfo executable not found: $ipinfoPath"
+        }
+    
+        Write-PSFMessage -Level Verbose -Message "Starting IP info retrieval for $(($ipList | Select-Object -Unique).Count) unique IP addresses"
     }
     
     process {
-
         try {
-            $result = $ip_list | Select-Object -Unique -Skip 1 | & $ipinfo -t $token -f $fields 
+            Write-PSFMessage -Level Verbose -Message "Executing IPInfo command"
+            $result = $ipList | Select-Object -Unique -Skip 1 | & $ipinfoPath -t $Token -f $Fields
+            $rawData = $result | ConvertFrom-Csv -Delimiter ','
+    
+            Write-PSFMessage -Level Verbose -Message "Processing $(($rawData | Measure-Object).Count) IP records"
+            $ipData = foreach ($data in $rawData) {
+                [PSCustomObject]@{
+                    ASN          = ($data.org -split ' ', 2)[0]
+                    Organization = ($data.org -split ' ', 2)[1]
+                    IP           = [System.Net.IPAddress]$data.ip
+                    Hostname     = $data.hostname
+                    Anycast      = [System.Convert]::ToBoolean($data.anycast)
+                    City         = $data.city
+                    Region       = $data.region
+                    Country      = $data.country
+                    CountryName  = $data.country_name
+                    Location     = $data.loc
+                    PostalCode   = $data.postal
+                    Timezone     = $data.timezone
+                }
+            }
+        } catch {
+            Write-PSFMessage -Level Error -Message "Error occurred while processing IP data" -ErrorRecord $_
+            throw
         }
-        catch {
-            Write-Error $_.Exception.Message
-        }
-        
-        $rawdata = $result | ConvertFrom-csv -Delimiter ','
-        $ipdata = foreach ($data in $rawdata) {
-            [PSCustomObject]@{
-                asn = ($data.org -split ' ',2)[0]
-                org = ($data.org -split ' ',2)[1]
-                ip = [System.Net.IPAddress]$data.ip
-                hostname = $data.hostname
-                anycast = $data.anycast
-                city = $data.city
-                region = $data.region
-                country = $data.country
-                country_name = $data.country_name
-                gps_loc = $data.loc
-                postalcode = $data.postal
-                timezone = $data.timezone
-        }}
     }
     
     end {
-        $ipdata
+        Write-PSFMessage -Level Verbose -Message "IP info retrieval completed successfully"
+        $ipData
     }
 }
