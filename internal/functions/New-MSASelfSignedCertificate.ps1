@@ -39,6 +39,8 @@ function New-MSASelfSignedCertificate {
             KeyAlgorithm      = $KeyAlgorithm
             Type              = $CertificateType
             CertStoreLocation = $CertStoreLocation
+            CertificateFormat = $CertificateFormat
+            EnhancedKeyUsage  = $EnhancedKeyUsage
         }
 
         $cert_param = Remove-FalsyHashtableEntry $certificate
