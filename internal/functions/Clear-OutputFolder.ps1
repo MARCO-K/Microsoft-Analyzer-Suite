@@ -4,13 +4,14 @@ function Clear-OutputFolder {
     Clears the contents of a specified output folder.
 
     .DESCRIPTION
-    The Clear-OutputFolder function removes all items (files and subdirectories) from a specified folder. If the folder doesn't exist, it creates it.
+    The Clear-OutputFolder function removes all items (files and subdirectories) from a specified folder.
+    If the folder doesn't exist, it creates it. This function uses PSFramework for logging.
 
-    .PARAMETER OUTPUT_FOLDER
+    .PARAMETER Path
     Specifies the path of the folder to be cleared. This parameter is mandatory and can be passed through the pipeline.
 
     .EXAMPLE
-    Clear-OutputFolder -OUTPUT_FOLDER "C:\Temp\OutputFolder"
+    Clear-OutputFolder -Path "C:\Temp\OutputFolder"
     Clears all contents of the "C:\Temp\OutputFolder" directory.
 
     .EXAMPLE
@@ -21,40 +22,47 @@ function Clear-OutputFolder {
     This function uses the Write-PSFMessage cmdlet for logging, which requires the PSFramework module.
 
     .INPUTS
-    System.IO.FileInfo
+    System.String
 
     .OUTPUTS
-    System.Boolean
-    Returns $true upon completion.
+    System.IO.DirectoryInfo
+    Returns the DirectoryInfo object of the cleared folder.
 
     .LINK
-
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+    [OutputType([System.IO.DirectoryInfo])]
     param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)][String]$OUTPUT_FOLDER
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Path
     )
     
-    begin {
-        if ( -Not (Test-Path $OUTPUT_FOLDER -PathType Container) ) {
-            Write-PSFMessage -Level 'Verbose' -Message 'Folder does not exist' -FunctionName $MyInvocation.MyCommand.Name
-            $OUTPUT_FOLDER = New-Item -Path $OUTPUT_FOLDER -ItemType 'Directory' -Force
-            Write-PSFMessage -Level 'Verbose' -Message "Folder $output_Folder created" -FunctionName $MyInvocation.MyCommand.Name
-        }
-    }
-    
     process {
-        Write-PSFMessage -Level 'Verbose' -Message "Deleting all files & Folders under: $output_Folder" -FunctionName $MyInvocation.MyCommand.Name
-        $files = (Get-ChildItem -Path $OUTPUT_FOLDER -Recurse).FullName 
-        if ($files) { 
-            $files | ForEach-Object { Remove-Item $_ -Force -Recurse -ErrorAction SilentlyContinue
-                Write-PSFMessage -Level 'Verbose' -Message "File deleted: $_" -FunctionName $MyInvocation.MyCommand.Name
+        try {
+            $fullPath = [System.IO.Path]::GetFullPath($Path)
+            Write-PSFMessage -Level Verbose -Message "Processing path: $fullPath" -FunctionName $MyInvocation.MyCommand.Name
+
+            if (-not (Test-Path -Path $fullPath -PathType Container)) {
+                Write-PSFMessage -Level Verbose -Message "Creating directory: $fullPath" -FunctionName $MyInvocation.MyCommand.Name
+                $directory = New-Item -Path $fullPath -ItemType Directory -Force -ErrorAction Stop
+            } else {
+                $directory = Get-Item -Path $fullPath -Force
             }
+
+            if ($PSCmdlet.ShouldProcess($fullPath, "Clear folder contents")) {
+                Get-ChildItem -Path $fullPath -Force | ForEach-Object {
+                    Remove-Item -Path $_.FullName -Force -Recurse -ErrorAction Stop
+                    Write-PSFMessage -Level Verbose -Message "Removed: $($_.FullName)" -FunctionName $MyInvocation.MyCommand.Name
+                }
+                Write-PSFMessage -Level Verbose -Message "Cleared all contents of: $fullPath" -FunctionName $MyInvocation.MyCommand.Name
+            }
+
+            return $directory
+        } catch {
+            Write-PSFMessage -Level Error -Message "Failed to clear directory: $fullPath" -FunctionName $MyInvocation.MyCommand.Name -Exception $_
+            Write-PSFMessage -Level Verbose -Message $_.Exception.Message -FunctionName $MyInvocation.MyCommand.Name
+            throw
         }
-    }
-    
-    end {
-        Write-PSFMessage -Level 'Verbose' -Message "Output folder: $output_Folder" -FunctionName $MyInvocation.MyCommand.Name
-        $OUTPUT_FOLDER
     }
 }
