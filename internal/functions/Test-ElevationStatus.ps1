@@ -1,53 +1,61 @@
 function Test-ElevationStatus {
     <#
-      .SYNOPSIS
-      Check if Powershell Console is running in elevated mode.
+    .SYNOPSIS
+    Checks if the PowerShell console is running in elevated mode.
 
-      .DESCRIPTION
-      This function is checking if Powershell Console is running in elevated mode(as administrator).
+    .DESCRIPTION
+    This function determines if the PowerShell console is running with elevated privileges (as administrator).
+    It can provide either a simple boolean result or detailed information about the PowerShell environment.
 
-      .EXAMPLE
-      Test-ElevationStatus
+    .PARAMETER Detailed
+    Switch parameter to return detailed information about the PowerShell environment.
 
-      .PARAMETER detailed
-      The parameter will switch to a detailed output version.
+    .EXAMPLE
+    Test-ElevationStatus
+    Returns a boolean indicating whether the console is elevated.
+
+    .EXAMPLE
+    Test-ElevationStatus -Detailed
+    Returns a hashtable with detailed information about the PowerShell environment, including elevation status.
+
+    .OUTPUTS
+    System.Boolean or System.Collections.Specialized.OrderedDictionary
+    Returns a boolean when -Detailed is not used, or an OrderedDictionary when -Detailed is specified.
     #>
-    [cmdletBinding()]
-
-    param
-    (
-        [switch]
-        $detailed
+    [CmdletBinding()]
+    [OutputType([bool], [System.Collections.Specialized.OrderedDictionary])]
+    param (
+        [switch]$Detailed
     )
 
-    process {
-
-        Write-PSFMessage -Level Verbose -Message "Checking if Powershell Console is running in elevated mode" -FunctionName $MyInvocation.MyCommand.Name
-        $IsElevated =     
-        if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
-        { $true }      
-        else
-        { $false }   
+    begin {
+        Write-PSFMessage -Level Verbose -Message "Checking if PowerShell console is running in elevated mode" -FunctionName $MyInvocation.MyCommand.Name
     }
+
+    process {
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $identity
+        $isElevated = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    }
+
     end {
-        if ($detailed) {       
-            Write-PSFMessage -Level 'Verbose' -Message 'Returning detailed info about Powershell Console' -FunctionName $MyInvocation.MyCommand.Name
-            $Props = [ordered]@{
-                IsElevated       = $IsElevated
-                Name             = $($Host.Name)
-                OS               = $($PSVersionTable.OS)
-                Platform         = $($PSVersionTable.Platform)
-                PSEdition        = $($PSVersionTable.PSEdition)
-                PSVersion        = $($Host.Version)
-                CurrentCulture   = $($Host.CurrentCulture)
-                CurrentUICulture = $($Host.CurrentUICulture)
-                DebuggerEnabled  = $($Host.DebuggerEnabled)
-                IsRunspacePushed = $($Host.IsRunspacePushed)
+        if ($Detailed) {
+            Write-PSFMessage -Level Verbose -Message 'Returning detailed info about PowerShell console' -FunctionName $MyInvocation.MyCommand.Name
+            [ordered]@{
+                IsElevated       = $isElevated
+                Name             = $Host.Name
+                OS               = $PSVersionTable.OS
+                Platform         = $PSVersionTable.Platform
+                PSEdition        = $PSVersionTable.PSEdition
+                PSVersion        = $PSVersionTable.PSVersion
+                CurrentCulture   = $Host.CurrentCulture
+                CurrentUICulture = $Host.CurrentUICulture
+                DebuggerEnabled  = $Host.DebuggerEnabled
+                IsRunspacePushed = $Host.IsRunspacePushed
             }
-            $Props
         } else {
-            Write-PSFMessage -Level 'Verbose' -Message 'Returning only IsElevated status' -FunctionName $MyInvocation.MyCommand.Name
-            $IsElevated
+            Write-PSFMessage -Level Verbose -Message 'Returning only IsElevated status' -FunctionName $MyInvocation.MyCommand.Name
+            $isElevated
         }
     }
 }
