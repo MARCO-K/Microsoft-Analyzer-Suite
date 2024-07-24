@@ -1,9 +1,8 @@
 ﻿$script:ModuleRoot = $PSScriptRoot
 $script:ModuleVersion = (Import-PowerShellDataFile -Path "$($script:ModuleRoot)\Microsoft-Analyzer-Suite.psd1").ModuleVersion
 
-# Detect whether at some level dotsourcing was enforced
-$script:doDotSource = Get-PSFConfigValue -FullName Microsoft-Analyzer-Suite.Import.DoDotSource -Fallback $false
-if ($Microsoft-Analyzer-Suite_dotsourcemodule) { $script:doDotSource = $true }
+## Initialize Module Configuration
+#Requires -Modules PSFramework, ImportExcel
 
 <#
 Note on Resolve-Path:
@@ -13,14 +12,7 @@ Resolve-Path can only be used for paths that already exist, Resolve-PSFPath can 
 This is important when testing for paths.
 #>
 
-# Detect whether at some level loading individual module files, rather than the compiled module was enforced
-$importIndividualFiles = Get-PSFConfigValue -FullName Microsoft-Analyzer-Suite.Import.IndividualFiles -Fallback $false
-if ($Microsoft-Analyzer-Suite_importIndividualFiles) { $importIndividualFiles = $true }
-if (Test-Path (Resolve-PSFPath -Path "$($script:ModuleRoot)\..\.git" -SingleItem -NewChild)) { $importIndividualFiles = $true }
-if ("<was not compiled>" -eq '<was not compiled>') { $importIndividualFiles = $true }
-	
-function Import-ModuleFile
-{
+function Import-ModuleFile {
 	<#
 		.SYNOPSIS
 			Loads files into the module on module import.
@@ -51,22 +43,19 @@ function Import-ModuleFile
 }
 
 #region Load individual files
-if ($importIndividualFiles)
-{
+if ($importIndividualFiles) {
 	# Execute Preimport actions
 	foreach ($path in (& "$ModuleRoot\internal\scripts\preimport.ps1")) {
 		. Import-ModuleFile -Path $path
 	}
 	
 	# Import all internal functions
-	foreach ($function in (Get-ChildItem "$ModuleRoot\internal\functions" -Filter "*.ps1" -Recurse -ErrorAction Ignore))
-	{
+	foreach ($function in (Get-ChildItem "$ModuleRoot\internal\functions" -Filter "*.ps1" -Recurse -ErrorAction Ignore)) {
 		. Import-ModuleFile -Path $function.FullName
 	}
 	
 	# Import all public functions
-	foreach ($function in (Get-ChildItem "$ModuleRoot\functions" -Filter "*.ps1" -Recurse -ErrorAction Ignore))
-	{
+	foreach ($function in (Get-ChildItem "$ModuleRoot\functions" -Filter "*.ps1" -Recurse -ErrorAction Ignore)) {
 		. Import-ModuleFile -Path $function.FullName
 	}
 	
