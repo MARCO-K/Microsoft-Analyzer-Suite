@@ -94,7 +94,7 @@ function Import-SupportlistFromFolder {
                 }
             }
         } else {
-            Write-PSFMessage -Level Warning -Message "No files found matching the filter in the specified folder"
+            Write-PSFMessage -Level Error -Message "No files found matching the filter in the specified folder"
         }
     }
 
