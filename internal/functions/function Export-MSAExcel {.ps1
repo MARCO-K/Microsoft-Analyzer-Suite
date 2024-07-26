@@ -25,7 +25,8 @@ function Export-MSAExcel {
         [object[]]$exportdata,
 
         [Parameter(Mandatory = $true)]
-        [string]$name
+        [string]$name,
+        [string]$ID
     )
 
     # Define the output folder path
@@ -43,19 +44,17 @@ function Export-MSAExcel {
             $BackgroundColor = [System.Drawing.Color]::FromArgb(50, 60, 220)
             $n = ($exportdata | Get-Member -MemberType Noteproperty | Measure-Object).Count
             $end = ([char](64 + $n), (+$n - 64))[$n -ge 65]
-            $header = '"A1:$end"'
-            Set-Format -Address $WorkSheet.Cells[$header] -BackgroundColor $BackgroundColor -FontColor White
-
-            # Set horizontal alignment for columns A to E
-            $WorkSheet.Cells[$header].Style.HorizontalAlignment = "Center"
+            $headerRange = "A1:$end" + "1"
+            Set-Format -Address $WorkSheet.Cells[$headerRange] -BackgroundColor $BackgroundColor -FontColor White -HorizontalAlignment Center
 
             # Retrieve the blacklist content based on the name
-            $Blacklist = ($supportlist | Where-Object { $_.Name -like $name }).Content
-            if ($Blacklist.Count -gt 0) {
-                $Col = ($Blacklist | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -eq $name }).Name
-                foreach ($value in $Blacklist.$Col) {
+            $BlacklistArray = ($supportlist | Where-Object { $_.Name -like $name }).Content
+            if ($BlacklistArray.Count -gt 0) {
+                $lookup = if ($ID) { $ID } { $name }
+                $Col = ($BlacklistArray | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -eq $lookup }).Name
+                foreach ($value in $BlacklistArray.$Col) {
                     $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $value
-                    Add-ConditionalFormatting -Address $WorkSheet.Cells[$header] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+                    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:$end"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
                 }
             }
         }
