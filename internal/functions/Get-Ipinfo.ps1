@@ -22,27 +22,20 @@ function Get-Ipinfo {
     This example retrieves IP information for the IP addresses listed in the 'ip-list.txt' file using the specified API token and includes only the 'ip', 'city', and 'country' fields in the API response.
 
     #>
+
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param (
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [object[]]$AddressList,    
         [Parameter(Mandatory = $true)]
         [string]$Token,
-    
-        [Parameter(Mandatory = $true)]
-        [string]$AddressList,
-    
         [string]$Fields = 'ip,hostname,anycast,city,region,country,country_name,loc,org,postal,timezone'
     )
     
     begin {
-    
-        # Check if the IP list exists and is not empty
-        if (-not (Test-Path -Path $AddressList -PathType Leaf)) {
-            Write-PSFMessage -Level Error -Message "IP list not found: $AddressList"
-            throw "IP list not found: $AddressList"
-        }
-    
-        $ipList = Get-Content $AddressList
-        if ($ipList.Count -eq 0) {
+        $AddressList.Count
+        if ($AddressList.count -eq 0) {
             Write-PSFMessage -Level Error -Message "IP list is empty: $AddressList"
             throw "IP list is empty: $AddressList"
         }
@@ -53,19 +46,19 @@ function Get-Ipinfo {
             throw "IPInfo executable not found: $ipinfoPath"
         }
     
-        Write-PSFMessage -Level Verbose -Message "Starting IP info retrieval for $(($ipList | Select-Object -Unique).Count) unique IP addresses"
+        Write-PSFMessage -Level Verbose -Message "Starting IP info retrieval for $($AddressList.Count) unique IP addresses"
     }
     
     process {
         try {
             Write-PSFMessage -Level Verbose -Message "Executing IPInfo command"
-            $result = $ipList | Select-Object -Unique -Skip 1 | & $ipinfoPath -t $Token -f $Fields
+            $result = $AddressList | & $ipinfoPath -t $Token -f $Fields -c
             $rawData = $result | ConvertFrom-Csv -Delimiter ','
     
-            Write-PSFMessage -Level Verbose -Message "Processing $(($rawData | Measure-Object).Count) IP records"
+            Write-PSFMessage -Level Verbose -Message "Processing $($rawData.Count) IP records"
             $ipData = foreach ($data in $rawData) {
                 [PSCustomObject]@{
-                    ASN          = ($data.org -split ' ', 2)[0]
+                    ASN          = ($data.org -split ' ', 2)[0] -replace 'AS', ''
                     Organization = ($data.org -split ' ', 2)[1]
                     IP           = [System.Net.IPAddress]$data.ip
                     Hostname     = $data.hostname
