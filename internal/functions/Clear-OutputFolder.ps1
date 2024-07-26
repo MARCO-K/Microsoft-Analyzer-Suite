@@ -62,7 +62,7 @@ function Clear-OutputFolder {
         } catch {
             Write-PSFMessage -Level Error -Message "Failed to clear directory: $fullPath" -FunctionName $MyInvocation.MyCommand.Name -Exception $_
             Write-PSFMessage -Level Verbose -Message $_.Exception.Message -FunctionName $MyInvocation.MyCommand.Name
-            throw
+            Exit
         }
     }
 }
