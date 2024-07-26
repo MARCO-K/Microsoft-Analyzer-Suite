@@ -1,74 +1,27 @@
-﻿$script:ModuleRoot = $PSScriptRoot
-$script:ModuleVersion = (Import-PowerShellDataFile -Path "$($script:ModuleRoot)\Microsoft-Analyzer-Suite.psd1").ModuleVersion
+﻿<#
+.DISCLAIMER
+	THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
+	ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+	THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
+	PARTICULAR PURPOSE.
 
-## Initialize Module Configuration
-#Requires -Modules PSFramework, ImportExcel
-
-<#
-Note on Resolve-Path:
-All paths are sent through Resolve-Path/Resolve-PSFPath in order to convert them to the correct path separator.
-This allows ignoring path separators throughout the import sequence, which could otherwise cause trouble depending on OS.
-Resolve-Path can only be used for paths that already exist, Resolve-PSFPath can accept that the last leaf my not exist.
-This is important when testing for paths.
+	Copyright (c) Microsoft Corporation. All rights reserved.
 #>
 
-function Import-ModuleFile {
-	<#
-		.SYNOPSIS
-			Loads files into the module on module import.
-		
-		.DESCRIPTION
-			This helper function is used during module initialization.
-			It should always be dotsourced itself, in order to proper function.
-			
-			This provides a central location to react to files being imported, if later desired
-		
-		.PARAMETER Path
-			The path to the file to load
-		
-		.EXAMPLE
-			PS C:\> . Import-ModuleFile -File $function.FullName
-	
-			Imports the file stored in $function according to import policy
-	#>
-	[CmdletBinding()]
-	Param (
-		[string]
-		$Path
-	)
-	
-	$resolvedPath = $ExecutionContext.SessionState.Path.GetResolvedPSPathFromPSPath($Path).ProviderPath
-	if ($doDotSource) { . $resolvedPath }
-	else { $ExecutionContext.InvokeCommand.InvokeScript($false, ([scriptblock]::Create([io.file]::ReadAllText($resolvedPath))), $null, $null) }
-}
+## Initialize Module Configuration
+#Requires -Modules Pester, Microsoft.Graph.Authentication
 
-#region Load individual files
-if ($importIndividualFiles) {
-	# Execute Preimport actions
-	foreach ($path in (& "$ModuleRoot\internal\scripts\preimport.ps1")) {
-		. Import-ModuleFile -Path $path
-	}
-	
-	# Import all internal functions
-	foreach ($function in (Get-ChildItem "$ModuleRoot\internal\functions" -Filter "*.ps1" -Recurse -ErrorAction Ignore)) {
-		. Import-ModuleFile -Path $function.FullName
-	}
-	
-	# Import all public functions
-	foreach ($function in (Get-ChildItem "$ModuleRoot\functions" -Filter "*.ps1" -Recurse -ErrorAction Ignore)) {
-		. Import-ModuleFile -Path $function.FullName
-	}
-	
-	# Execute Postimport actions
-	foreach ($path in (& "$ModuleRoot\internal\scripts\postimport.ps1")) {
-		. Import-ModuleFile -Path $path
-	}
-	
-	# End it here, do not load compiled code below
-	return
-}
-#endregion Load individual files
+## Initialize Module Variables
+## Update Clear-ModuleVariable function in internal/Clear-ModuleVariable.ps1 if you add new variables here
 
-#region Load compiled code
-"<compile code into here>"
-#endregion Load compiled code
+# Import private and public scripts and expose the public ones
+$privateScripts = @(Get-ChildItem -Path "$PSScriptRoot\internal\functions" -Recurse -Filter "*.ps1")
+$publicScripts = @(Get-ChildItem -Path "$PSScriptRoot\functions" -Recurse -Filter "*.ps1")
+
+foreach ($script in ($privateScripts + $publicScripts)) {
+	try {
+		. $script.FullName
+	} catch {
+		Write-Error -Message ("Failed to import function {0}: {1}" -f $script, $_)
+	}
+}
