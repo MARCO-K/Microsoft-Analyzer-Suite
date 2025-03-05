@@ -1,36 +1,101 @@
-function Open-JsonFile {
+function Open-JsonFile
+{
+    <#
+    .SYNOPSIS
+    Opens and parses JSON files with validation and error handling
+    
+    .DESCRIPTION
+    Accepts file paths or FileInfo objects, validates JSON structure, and returns parsed objects
+    
+    .PARAMETER InputObject
+    Path to JSON file or FileInfo object
+    
+    .EXAMPLE
+    Get-ChildItem config.json | Open-JsonFile
+    
+    .EXAMPLE
+    Open-JsonFile -InputObject "C:\data\settings.json"
+    #>
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Low')]
+    [OutputType([PSCustomObject])]
     param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        $InputObject
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [Alias("FullName")]
+        [ValidateScript({
+                if ($_ -is [string]) { Test-Path $_ } 
+                else { $_.Exists }
+            })]
+        [ValidatePattern('\.json$')]
+        [object]$InputObject,
+
+        [ValidateSet('UTF8', 'Unicode', 'UTF32', 'ASCII')]
+        [string]$Encoding = 'UTF8'
     )
 
-    try {
-        # Check if the input is a string
-        if ($InputObject -is [System.String]) {
-            $filePath = $InputObject
-            Write-PSFMessage -Level Verbose -Message "Input object is a string (file path)" -FunctionName $MyInvocation.MyCommand.Name
-        }
-        # Check if the input has a FullName property (like a FileInfo object)
-        elseif ($InputObject.PSObject.Properties.Name -contains 'FullName') {
-            $filePath = $InputObject.FullName
-            Write-PSFMessage -Level Verbose -Message "Input object has a FullName property" -FunctionName $MyInvocation.MyCommand.Name
-        } else {
-            throw "Invalid input type. Expected a file path (string) or an object with a FullName property."
-        }
+    begin
+    {
+    }
 
-        Write-PSFMessage -Level Verbose -Message "Attempting to open file: $filePath" -FunctionName $MyInvocation.MyCommand.Name
+    process
+    {
+        try
+        {
+            # Resolve file path
+            $filePath = if ($InputObject -is [string])
+            { 
+                $InputObject 
+            }
+            else
+            { 
+                $InputObject.FullName 
+            }
 
-        # Verify the file exists
-        if (-not (Test-Path $filePath)) {
-            throw "File not found: $filePath"
+            # Validate file type
+            if (-not (Test-Path -Path $filePath -PathType Leaf))
+            {
+                throw "Path is not a file: $filePath"
+            }
+
+            # Confirm action
+            if (-not $PSCmdlet.ShouldProcess($filePath, "Open JSON file"))
+            {
+                return
+            }
+
+            # Read file
+            Write-PSFMessage -Level Verbose -Message "Reading file: $filePath"
+            $jsonContent = [System.IO.File]::ReadAllText($filePath, [System.Text.Encoding]::$Encoding)
+
+            # Parse JSON
+            Write-PSFMessage -Level Verbose -Message "Parsing JSON content"
+            $parsedData = $jsonContent | ConvertFrom-Json -Depth 10
+
+            return $parsedData
         }
+        catch [System.IO.FileNotFoundException]
+        {
+            Write-PSFMessage -Level Error -Message "File not found: $filePath"
+            return $null
+        }
+        catch [System.Management.Automation.ItemNotFoundException]
+        {
+            Write-PSFMessage -Level Error -Message "Path invalid: $filePath"
+            return $null
+        }
+        catch [System.ArgumentException]
+        {
+            Write-PSFMessage -Level Error -Message "Invalid JSON path: $filePath"
+            return $null
+        }
+        catch
+        {
+            Write-PSFMessage -Level Error -Message "Error processing JSON file: $($_.Exception.Message)" -ErrorRecord $_
+            return $null
+        }
+    }
 
-        # Attempt to read and parse the JSON file
-        $jsonContent = Get-Content $filePath -Raw | ConvertFrom-Json
-        Write-PSFMessage -Level Verbose -Message "Successfully opened and parsed JSON file: $filePath" -FunctionName $MyInvocation.MyCommand.Name
-        return $jsonContent
-    } catch {
-        Write-PSFMessage -Level Error -Message "Error processing JSON file: $_" -ErrorRecord $_ -FunctionName $MyInvocation.MyCommand.Name
-        return $null
+    end
+    {
+        Write-PSFMessage -Level Verbose -Message "Operation completed."
     }
 }
