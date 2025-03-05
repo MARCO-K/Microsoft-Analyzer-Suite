@@ -69,7 +69,8 @@ function Open-JsonFile
             # Parse JSON
             Write-PSFMessage -Level Verbose -Message "Parsing JSON content"
             $parsedData = $jsonContent | ConvertFrom-Json -Depth 10
-
+            
+            Write-PSFMessage -Level Verbose -Message "Returning $($parsedData.Count) objects"
             return $parsedData
         }
         catch [System.IO.FileNotFoundException]
